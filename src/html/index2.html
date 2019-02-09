@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Bot for Twitter</title>
+    <link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.min.css">
+</head>
+<body style="overflow: hidden; color:  color: #231f20; font-size: 12px;">
+    <style type="text/css">
+        input, select, textarea {
+            font-size: 12px !important;
+        }
+    </style>
+    <div class="row">
+        <div class="col-4" style="border-right: 1px solid #ccc; height: 100vh; overflow-y: auto;">
+            <div class="row" style="margin: 15px;">
+               <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                  <strong>Bot for Twitter</strong> set the configuration parameters to start the bot.
+                  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <p style="font-weight: bold; color: #231f20; font-size: 12px;">CONFIGURATION AND STARTING:</p>
+                <form onsubmit="javscript: sendForm(event);">
+                    <div class="form-group">
+                        <label for="listAccounts">List of accounts to observe:</label>
+                        <input type="file" class="form-control" id="listAccounts">
+                    </div>
+                    <div class="form-group">
+                        <label for="listEmails">List of emails to notify:</label>
+                        <input type="file" class="form-control" id="listEmails">
+                    </div>
+                    <div class="form-group">
+                        <label for="keywords">Search criteria:</label>
+                        <textarea class="form-control" id="keywords" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-8">
+                            <select class="form-control form-control-sm" id="initCommand">
+                                <option value="1">Wait for new Tweets</option>
+                                <option value="2">Start reading and wait for new tweets</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <input type="number" class="form-control" id="numberTweets" aria-describedby="numberTweetsHelp" value="30">
+                            <small id="numberTweets" class="form-text text-muted">Number of tweets to read.</small>
+                        </div>
+                    </div>
+                    <div class="form-group form-check">
+                        <input type="checkbox" class="form-check-input" id="isRecursive">
+                        <label class="form-check-label" for="isRecursive">Use recursive search.</label>
+                    </div>
+                    <div style="margin-top: 15px;">
+                       <button type="submit" class="btn btn-primary" id="startBot">Start</button>
+                       <button type="submit" class="btn btn-default" id="stopBot">Stop</button>
+                    </div>
+                </form>
+                <div style="margin-top: 15px; margin-bottom: 10px; border-top: 1px solid #ccc; width: 100%;">
+                    <p style="font-weight: bold; color: #231f20; font-size: 12px; margin-top: 10px;">OUTPUT:</p>
+                    <div id="output" style="line-height: 14px;">
+                        <p style="margin: 0px;">Application started...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-8" style="height: 100vh;">
+            <webview id="webView" src="https://twitter.com/login" useragent="Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko" style="display: inline-flex; width: 100%; height: 100vh;"></webview>
+        </div>
+    </div>
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="node_modules/bootstrap/js/dist/index.js"></script>
+    <script>if (window.module) module = window.module;</script>
+    <script>
+        /**
+        * Opcion de recursividad
+        * se repite las acciones
+        * Boton Stop
+        * Busqueda avanzada
+        * Resaltar en negrilla las palabras encontradas en el correo
+        * Incluir nombre de la cuenta del tweet y hora en el correo
+        **/
+        let stopEngine = false,
+            webView = document.getElementById('webView'),
+            executeJavaScriptCode = null,            
+            executeJavaScriptCallback = null,
+            listAccounts = [],
+            listEmails = [],
+            keywords = [],
+            lastTweet = [],
+            initCommand = [];
+        
+        $(document).ready(() => {
+            $('#listAccounts').change(() => {
+                readAsText(
+                    document.getElementById('listAccounts'), (result) => {
+                        listAccounts = result.split(/\n/)
+                            .filter((item) => { return item.startsWith('@') })
+                            .map((item) => { return item.substr(1) });
+                    });
+            });
+            
+            $('#listEmails').change(() => {
+                readAsText(
+                    document.getElementById('listEmails'), (result) => {
+                        listEmails = result.split(/\n/)
+                            .filter((item) => { return item.indexOf('@') !== -1 });
+                    });
+            });
+            
+            $('#stopBot').click(function() {
+                
+            });
+            
+            webView.addEventListener('dom-ready', () => {
+                if (executeJavaScriptCode != null) {
+                    webView.executeJavaScript(executeJavaScriptCode, false, (n) => { executeJavaScriptCallback(n) });
+                }
+            });
+        });
+        
+        function sendForm(event) {
+            event.preventDefault();
+            
+            keywords = $('#keywords').val().split(',');
+           
+            let startBot = $('#startBot');
+            
+            startBot.attr('disabled', 'disabled')
+             
+            printMessage('Preparing data...');
+            
+            if (listAccounts.length > 0) {
+                openProfile(0);
+            }
+            
+        }
+        
+        function openProfile(currentIndex) {
+            let item = listAccounts[currentIndex];
+            
+            let numberTweets = $('#numberTweets').val(),                
+                isRecursive = $('#isRecursive').prop('checked');
+            
+            printMessage('Opening profile [@' + item + ']');
+            if (initCommand[item] == undefined) {
+                initCommand[item] = $('#initCommand').val();
+            }
+            if (initCommand[item] == 1) {
+                printMessage('Acting in mode 1 for [@' + item + ']');
+                executeJavaScriptCode = `var tweets = [];` +
+                                    `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
+                                        `tweets.push($(this).html());`+
+                                    `});` +
+                                    `Promise.resolve(tweets)`;
+            } else if (initCommand[item] == 2) {
+                printMessage('Acting in mode 2 for [@' + item + ']');
+                executeJavaScriptCode = `var tweets = [];` +
+                                    `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
+                                        `tweets.push($(this).html());`+
+                                    `});` +
+                                    `Promise.resolve(tweets)`;
+            }
+            
+            executeJavaScriptCallback = (result) => {
+                let matches = [];
+                printMessage('Analyzing tweets from [@' + item + ']');
+                let size = 10;
+                if (initCommand[item] == 2) {
+                    size = numberTweets;
+                    
+                    initCommand[item] = 1;
+                }
+                
+                if (lastTweet[item] !== $(result[0]).find('.tweet-text:eq(0)').text()) {
+                    lastTweet[item] = $(result[0]).find('.tweet-text:eq(0)').text();
+                    for (let i = 0; i < size; i++) {
+                        let element = $(result[i]),
+                            tweet = element.find('.tweet-text').text(),
+                            match = false;
+
+                        keywords.forEach((key) => {
+                            if (tweet.toLowerCase().indexOf(key) !== -1) {
+                                tweet.replace(key, '<b>' + key + '<b>');
+
+                                match = true;
+                            }
+                        });
+
+                        if (match) {
+                            matches.push(tweet);
+                        }
+                    }
+
+                    if (matches.length > 0) {
+                        printMessage('We were lucky!, notifying the email list...');
+
+                        sendEmail(matches);
+                    }
+                } else {
+                    printMessage('No tweets found for [@' + item + ']');
+                }
+                
+            };
+            
+            webView.loadURL('https://twitter.com/' + item);
+            
+            setTimeout(() => {
+                if (currentIndex == (listAccounts.length - 1)) {
+                    currentIndex = 0;
+                    
+                    printMessage('Preparing for another round...');
+                    executeJavaScriptCallback = null;
+                    executeJavaScriptCode = null;
+                    
+                    webView.loadURL('https://twitter.com');
+                    setTimeout(() => {
+                         openProfile(currentIndex);
+                    }, 5000);
+                } else {
+                    currentIndex = currentIndex + 1;
+                    openProfile(currentIndex);
+                }
+            }, 60000 * 10); // 10 minutes
+        }
+        
+        function sendEmail(matches) {
+            $.post('http://190.216.238.18:9935/sendemail.php', {
+                'body': JSON.stringify(matches),
+                'emails': JSON.stringify(listEmails),
+                'keywords': JSON.stringify(keywords)
+            }, (data) => {
+                 printMessage('All notified, let\'s continue....');
+            });
+        }
+        
+        function readAsText(element, callback) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                callback(reader.result);
+            };
+            
+            reader.readAsText(element.files[0]);
+        }
+        
+        function printMessage(message) {
+            $('#output').append('<p style="margin: 0px;">' + message + '</p>');
+        }
+        
+        // You can also require other files to run in this process
+        require('./renderer.js');
+    </script>
+</body>
+</html>

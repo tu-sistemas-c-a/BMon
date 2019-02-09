@@ -1,0 +1,22 @@
+{
+  "name": "bot_for_",
+  "version": "1.0.0",
+  "description": "Bot for Twitter",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "build --dir",
+    "dist": "build"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^4.0.4",
+    "electron-builder": "^20.38.5"
+  },
+  "dependencies": {
+    "bootstrap": "^4.2.1",
+    "jquery": "^3.3.1",
+    "popper.js": "^1.14.7"
+  }
+}
