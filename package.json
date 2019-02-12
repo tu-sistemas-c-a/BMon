@@ -1,8 +1,8 @@
 {
-  "name": "bot_for_",
+  "name": "spy_robot",
   "version": "1.0.0",
-  "description": "Bot for Twitter",
-  "main": "src/index.js",
+  "description": "Spy robot made with electron.",
+  "main": "index.js",
   "scripts": {
     "start": "electron .",
     "pack": "build --dir",
