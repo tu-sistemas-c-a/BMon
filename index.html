@@ -75,6 +75,17 @@
         function getMatches(p0, p1) {
             let join = false,
                 search = p1.split(',');
+            
+            for(let i = 0; i < search.length; i++) {
+                if (search[i].startsWith('"')) {
+                    if (p0.indexOf(search[i].replace(/"/g)) !== -1) {
+                        join = true;
+                        
+                        p0 = p0.replace(search[i].replace(/"/g), '<b>' + search[i].replace(/"/g) + '</b>');
+                    }
+                }
+            }
+            
             for(let i = 0; i < search.length; i++) {
                 if (search[i].startsWith('+')) {
                     if (p0.toLowerCase().indexOf(search[i].substr(1).toLowerCase()) !== -1) {
@@ -87,7 +98,21 @@
             
             for(let i = 0; i < search.length; i++) {
                 if (search[i].startsWith('%')) {
-                    //
+                    for (let j = 0; j < p0.split(' ').length; j++) {
+                        if (getEditDistance(search[i].substr(1), p.split(' ')[j]) <= 2) {
+                            join = true;
+                        }
+                    }
+                }
+            }
+            
+            for(let i = 0; i < search.length; i++) {
+                if (! search[i].startsWith('%') && ! search[i].startsWith('+') && ! search[i].startsWith('-') && ! search[i].startsWith('"')) {
+                     if (p0.toLowerCase().indexOf(search[i].toLowerCase()) !== -1) {
+                        join = true;
+                        
+                        p0 = p0.toLowerCase().replace(search[i].toLowerCase(), '<b>' + search[i].toLowerCase() + '</b>');
+                    }
                 }
             }
             
@@ -199,88 +224,90 @@
         }
         
         function openProfile(currentIndex) {
-            let item = listAccounts[currentIndex];
+            if (! stopEngine) {
+                let item = listAccounts[currentIndex];
             
-            let numberTweets = $('#numberTweets').val(),                
-                isRecursive = $('#isRecursive').prop('checked');
-            
-            printMessage('Opening profile [@' + item + ']');
-            if (initCommand[item] == undefined) {
-                initCommand[item] = $('#initCommand').val();
-            }
-            if (initCommand[item] == 1) {
-                printMessage('Acting in mode 1 for [@' + item + ']');
-                executeJavaScriptCode = `var tweets = [];` +
-                                    `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
-                                        `tweets.push($(this).html());`+
-                                    `});` +
-                                    `Promise.resolve(tweets)`;
-            } else if (initCommand[item] == 2) {
-                printMessage('Acting in mode 2 for [@' + item + ']');
-                executeJavaScriptCode = `var tweets = [];` +
-                                    `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
-                                        `tweets.push($(this).html());`+
-                                    `});` +
-                                    `Promise.resolve(tweets)`;
-            }
-            
-            executeJavaScriptCallback = (result) => {
-                let matches = [];
-                printMessage('Analyzing tweets from [@' + item + ']');
-                let size = 10;
-                if (initCommand[item] == 2) {
-                    size = numberTweets;
-                    
-                    initCommand[item] = 1;
+                let numberTweets = $('#numberTweets').val(),                
+                    isRecursive = $('#isRecursive').prop('checked');
+
+                printMessage('Opening profile [@' + item + ']');
+                if (initCommand[item] == undefined) {
+                    initCommand[item] = $('#initCommand').val();
                 }
-                
-                if (lastTweet[item] !== $(result[0]).find('.tweet-text:eq(0)').text()) {
-                    lastTweet[item] = $(result[0]).find('.tweet-text:eq(0)').text();
-                    for (let i = 0; i < size; i++) {
-                        let element = $(result[i]),
-                            tweet = element.find('.tweet-text').text(),
-                            match = false;
-                        
-                        match = getMatches(tweet, keywords.join(','));
-                        
-                        if (match !== false) {
-                            tweet = match
-                            $(result[0]).find('.stream-item-header button').hide();
-                            tweet = '<img src="' + $(result[0]).find('img.avatar:eq(0)').attr('src') + '" style="width: 42px;">' + $(result[0]).find('strong.fullname').text() + ' ' + $(result[0]).find('span.username').text() + ' ' + $(result[0]).find('span._timestamp').text() + '<br/>' + tweet;
-                            matches.push(tweet);
+                if (initCommand[item] == 1) {
+                    printMessage('Acting in mode 1 for [@' + item + ']');
+                    executeJavaScriptCode = `var tweets = [];` +
+                                        `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
+                                            `tweets.push($(this).html());`+
+                                        `});` +
+                                        `Promise.resolve(tweets)`;
+                } else if (initCommand[item] == 2) {
+                    printMessage('Acting in mode 2 for [@' + item + ']');
+                    executeJavaScriptCode = `var tweets = [];` +
+                                        `$('#stream-items-id li.stream-item div.tweet').each(function() {` +
+                                            `tweets.push($(this).html());`+
+                                        `});` +
+                                        `Promise.resolve(tweets)`;
+                }
+
+                executeJavaScriptCallback = (result) => {
+                    let matches = [];
+                    printMessage('Analyzing tweets from [@' + item + ']');
+                    let size = 10;
+                    if (initCommand[item] == 2) {
+                        size = numberTweets;
+
+                        initCommand[item] = 1;
+                    }
+
+                    if (lastTweet[item] !== $(result[0]).find('.tweet-text:eq(0)').text()) {
+                        lastTweet[item] = $(result[0]).find('.tweet-text:eq(0)').text();
+                        for (let i = 0; i < size; i++) {
+                            let element = $(result[i]),
+                                tweet = element.find('.tweet-text').text(),
+                                match = false;
+
+                            match = getMatches(tweet, keywords.join(','));
+
+                            if (match !== false) {
+                                tweet = match
+                                $(result[0]).find('.stream-item-header button').hide();
+                                tweet = '<img src="' + $(result[0]).find('img.avatar:eq(0)').attr('src') + '" style="width: 42px;">' + $(result[0]).find('strong.fullname').text() + ' ' + $(result[0]).find('span.username').text() + ' ' + $(result[0]).find('span._timestamp').text() + '<br/>' + tweet;
+                                matches.push(tweet);
+                            }
                         }
+
+                        if (matches.length > 0) {
+                            printMessage('We were lucky!, notifying the email list...');
+
+                            sendEmail(matches);
+                        }
+                    } else {
+                        printMessage('No tweets found for [@' + item + ']');
                     }
 
-                    if (matches.length > 0) {
-                        printMessage('We were lucky!, notifying the email list...');
+                };
 
-                        sendEmail(matches);
+                webView.loadURL('https://twitter.com/' + item);
+
+                setTimeout(() => {
+                    if (currentIndex == (listAccounts.length - 1)) {
+                        currentIndex = 0;
+
+                        printMessage('Preparing for another round...');
+                        executeJavaScriptCallback = null;
+                        executeJavaScriptCode = null;
+
+                        webView.loadURL('https://twitter.com');
+                        setTimeout(() => {
+                             openProfile(currentIndex);
+                        }, 60000 * 5); // 5 minutes
+                    } else {
+                        currentIndex = currentIndex + 1;
+                        openProfile(currentIndex);
                     }
-                } else {
-                    printMessage('No tweets found for [@' + item + ']');
-                }
-                
-            };
-            
-            webView.loadURL('https://twitter.com/' + item);
-            
-            setTimeout(() => {
-                if (currentIndex == (listAccounts.length - 1)) {
-                    currentIndex = 0;
-                    
-                    printMessage('Preparing for another round...');
-                    executeJavaScriptCallback = null;
-                    executeJavaScriptCode = null;
-                    
-                    webView.loadURL('https://twitter.com');
-                    setTimeout(() => {
-                         openProfile(currentIndex);
-                    }, 5000);
-                } else {
-                    currentIndex = currentIndex + 1;
-                    openProfile(currentIndex);
-                }
-            }, 60000 * 10); // 10 minutes
+                }, 60000 * 1); // 1 minutes
+            }
         }
         
         function sendEmail(matches) {
@@ -305,6 +332,40 @@
         function printMessage(message) {
             $('#output').append('<p style="margin: 0px;">' + message + '</p>');
         }
+        
+        var getEditDistance = function(a, b){
+  if(a.length == 0) return b.length; 
+  if(b.length == 0) return a.length; 
+
+  var matrix = [];
+
+  // increment along the first column of each row
+  var i;
+  for(i = 0; i <= b.length; i++){
+    matrix[i] = [i];
+  }
+
+  // increment each column in the first row
+  var j;
+  for(j = 0; j <= a.length; j++){
+    matrix[0][j] = j;
+  }
+
+  // Fill in the rest of the matrix
+  for(i = 1; i <= b.length; i++){
+    for(j = 1; j <= a.length; j++){
+      if(b.charAt(i-1) == a.charAt(j-1)){
+        matrix[i][j] = matrix[i-1][j-1];
+      } else {
+        matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, // substitution
+                                Math.min(matrix[i][j-1] + 1, // insertion
+                                         matrix[i-1][j] + 1)); // deletion
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+};
         
         // You can also require other files to run in this process
         require('renderer.js');
