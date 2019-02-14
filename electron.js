@@ -11,7 +11,7 @@ function createWindow () {
 
     // and load the index.html of the app.
     // noinspection JSUnresolvedFunction
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(`file://${__dirname}/static/index.html`);
 
     // Open the DevTools.
     // mainWindow.webContents.openDevTools()
